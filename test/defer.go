@@ -28,11 +28,39 @@ func testDeferValidAccess(tc *oneGuardStruct) {
 	}()
 }
 
+func testMultipleDefersValidAccess(tc *oneGuardStruct) {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	defer func() {
+		tc.guardedField = 1
+	}()
+}
+
 func testDeferInvalidAccess(tc *oneGuardStruct) {
 	tc.mu.Lock()
 	defer func() {
 		// N.B. Executed after tc.mu.Unlock().
 		tc.guardedField = 1 // +checklocksfail
 	}()
+	tc.mu.Unlock()
+}
+
+func testDeferNonInlinedClosure(tc *oneGuardStruct) {
+	tc.mu.Lock()
+	// Store closure in a variable to prevent inlining
+	cleanup := func() {
+		tc.guardedField = 1
+		tc.mu.Unlock()
+	}
+	defer cleanup()
+}
+
+func testDeferNonInlinedClosureInvalid(tc *oneGuardStruct) {
+	tc.mu.Lock()
+	// Store closure in a variable to prevent inlining
+	cleanup := func() {
+		tc.guardedField = 1 // +checklocksfail
+	}
+	defer cleanup()
 	tc.mu.Unlock()
 }

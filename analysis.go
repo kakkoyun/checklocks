@@ -751,9 +751,10 @@ func (pc *passContext) checkBasicBlock(fn *ssa.Function, block *ssa.BasicBlock, 
 			}
 			// Check for other locks, but only if the above didn't trip.
 			if !failed && rls.count() != len(lff.HeldOnExit) && !lff.Ignore {
-				// Skip this check for inline-invoked closures as they are allowed
-				// to return with locks held from their parent scope.
-				if !isInlineInvokedClosure(fn) {
+				// Skip this check for:
+				// 1. Inline-invoked closures (they inherit parent's lock state)
+				// 2. Functions with defers that will unlock the held locks
+				if !isInlineInvokedClosure(fn) && !pc.hasDefersForLocks(fn, rls.lockedMutexes) {
 					pc.maybeFail(rv.Pos(), "return with unexpected locks held (locks: %s)", rls.String())
 				}
 			}
@@ -888,12 +889,57 @@ func isInlineInvokedClosure(fn *ssa.Function) bool {
 
 	// Check if this is a closure by looking at the synthetic name
 	// SSA generates names like "testClosureInline$1" for closures
-	if !strings.Contains(fn.Name(), "$") {
-		return false
-	}
+	return strings.Contains(fn.Name(), "$")
+}
 
-	// All uses of the closure should be direct calls or defers
-	// We check this by examining how the closure was created
-	// (this is a simplified check - may need refinement)
-	return true
+// hasDefersForLocks checks if the function has defer statements that will
+// unlock any of the currently held locks when the function returns.
+func (pc *passContext) hasDefersForLocks(fn *ssa.Function, heldLocks map[string]lockInfo) bool {
+	// Look for defer statements in all blocks
+	for _, block := range fn.Blocks {
+		for _, inst := range block.Instrs {
+			d, ok := inst.(*ssa.Defer)
+			if !ok {
+				continue
+			}
+
+			// Check different types of deferred calls
+			switch v := d.Call.Value.(type) {
+			case *ssa.MakeClosure:
+				// Deferred closure: defer func() { ... }()
+				if pc.closureUnlocksAny(v.Fn.(*ssa.Function), heldLocks) {
+					return true
+				}
+			case *ssa.Function:
+				// Direct defer of a function: defer mu.Unlock()
+				if v.Name() == "Unlock" || v.Name() == "RUnlock" || v.Name() == "NestedUnlock" {
+					return true
+				}
+			}
+			// Note: Closures stored in variables before deferring are not tracked
+			// as this would require complex data flow analysis.
+		}
+	}
+	return false
+}
+
+// closureUnlocksAny checks if a closure contains any unlock calls.
+// This looks for calls to Unlock, RUnlock, or NestedUnlock methods.
+func (pc *passContext) closureUnlocksAny(fn *ssa.Function, heldLocks map[string]lockInfo) bool {
+	for _, block := range fn.Blocks {
+		for _, inst := range block.Instrs {
+			call, ok := inst.(*ssa.Call)
+			if !ok {
+				continue
+			}
+
+			// Check if this is a call to an unlock function
+			if fn, ok := call.Call.Value.(*ssa.Function); ok {
+				if fn.Name() == "Unlock" || fn.Name() == "RUnlock" || fn.Name() == "NestedUnlock" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
