@@ -74,6 +74,7 @@ type passContext struct {
 	exemptions   map[positionKey]struct{}
 	forced       map[positionKey]struct{}
 	functions    map[*ssa.Function]struct{}
+	curFn        *ssa.Function
 	observations map[types.Object]*objectObservations
 }
 
