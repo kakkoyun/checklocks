@@ -16,10 +16,10 @@ package checklocks
 
 import (
 	"fmt"
+	"strings"
 
 	"go/token"
 	"strconv"
-	"strings"
 )
 
 const (
@@ -84,17 +84,27 @@ func (pc *passContext) addForce(pos token.Pos) {
 
 // maybeFail checks a potential failure against a specific failure map.
 func (pc *passContext) maybeFail(pos token.Pos, fmtStr string, args ...any) {
-	if fd, ok := pc.failures[pc.positionKey(pos)]; ok {
+	origPos := pos
+	reportPos := pos
+	if !pos.IsValid() && pc.curFn != nil {
+		reportPos = pc.curFn.Pos()
+	}
+
+	// Always use the original position for the key to maintain
+	// consistent failure tracking behavior.
+	key := pc.positionKey(origPos)
+
+	if fd, ok := pc.failures[key]; ok {
 		fd.seen++
 		return
 	}
-	if _, ok := pc.exemptions[pc.positionKey(pos)]; ok {
+	if _, ok := pc.exemptions[key]; ok {
 		return // Ignored, not counted.
 	}
-	if !enableWrappers && !pos.IsValid() {
+	if !enableWrappers && !origPos.IsValid() {
 		return // Ignored, implicit.
 	}
-	pc.pass.Reportf(pos, fmtStr, args...)
+	pc.pass.Reportf(reportPos, fmtStr, args...)
 }
 
 // checkFailure checks for the expected failure counts.
