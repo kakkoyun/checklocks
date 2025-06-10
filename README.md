@@ -1,5 +1,12 @@
 # CheckLocks Analyzer
 
+> [!CAUTION]
+> This is a fork of the original CheckLocks analyzer that lives in the [gvisor](https://github.com/google/gvisor/tree/master/tools/checklocks) repository. This is a temporary fork to allow for the development of the analyzer and testing.
+
+```sh
+go install github.com/kakkoyun/checklocks/cmd/checklocks@main
+```
+
 <!--* freshness: { owner: 'gvisor-eng' reviewed: '2022-02-02' } *-->
 
 Checklocks is an analyzer for lock and atomic constraints. The analyzer relies
@@ -77,10 +84,10 @@ read lock, in the case of an `sync.RWMutex`.
 The locks must be resolvable within the scope of the declaration. This means the
 lock must refer to one of:
 
-*   A struct-local lock (e.g. mu).
-*   A lock resolvable from the local struct (e.g. fieldX.mu).
-*   A global lock (e.g. globalMu).
-*   A lock resolvable from a global struct (e.g. globalX.mu).
+* A struct-local lock (e.g. mu).
+* A lock resolvable from the local struct (e.g. fieldX.mu).
+* A global lock (e.g. globalMu).
+* A lock resolvable from a global struct (e.g. globalX.mu).
 
 Like atomic access enforcement, checks may be elided on newly allocated objects.
 
@@ -95,28 +102,28 @@ func (f *foo) doThingLocked() { }
 
 The field provided in the `+checklocks` annotation must be resolvable as one of:
 
-*   A parameter, receiver or return value (e.g. mu).
-*   A lock resolvable from a parameter, receiver or return value (e.g. f.mu).
-*   A global lock (e.g. globalMu).
-*   A lock resolvable from a global struct (e.g. globalX.mu).
+* A parameter, receiver or return value (e.g. mu).
+* A lock resolvable from a parameter, receiver or return value (e.g. f.mu).
+* A global lock (e.g. globalMu).
+* A lock resolvable from a global struct (e.g. globalX.mu).
 
 This annotation will ensure that the given lock is held for all calls, and all
 analysis of this function will assume that this is the case.
 
 Additional variants of the `+checklocks` annotation are supported for functions:
 
-*   `+checklocksread`: This enforces that at least a read lock is held. Note
+* `+checklocksread`: This enforces that at least a read lock is held. Note
     that this assumption will apply locally, so accesses and function calls will
     assume that only a read lock is available.
-*   `+checklocksacquire`: This enforces that the given lock is *not* held on
+* `+checklocksacquire`: This enforces that the given lock is *not* held on
     entry, but it will be held on exit. This assertion will be checked locally
     and applied to the caller's lock state.
-*   `+checklocksrelease`: This enforces that the given lock is held on entry,
+* `+checklocksrelease`: This enforces that the given lock is held on entry,
     and will be release on exit. This assertion is checked locally and applied
     to the caller's lock state.
-*   `+checklocksacquireread`: A read variant of `+checklocksacquire`.
-*   `+checklocksreleaseread`: A read variant of `+checklocksrelease`.
-*   `+checklocksalias:a.b.c=x.y`: For parameters with complex relationships,
+* `+checklocksacquireread`: A read variant of `+checklocksacquire`.
+* `+checklocksreleaseread`: A read variant of `+checklocksrelease`.
+* `+checklocksalias:a.b.c=x.y`: For parameters with complex relationships,
     this annotation can be used to specify that the `a.b.c` lock is equivalent
     to the `x.y` state. That is, any operation on either of these locks applies
     to both, and any assertions that can be made about either applies to both.
@@ -176,13 +183,13 @@ by a mutex. Generally, this imposes the following requirements:
 
 For a read, one of the following must be true:
 
-1.  A lock held be held.
-1.  The access is atomic.
+1. A lock held be held.
+1. The access is atomic.
 
 For a write, both of the following must be true:
 
-1.  The lock must be held.
-1.  The write must be atomic.
+1. The lock must be held.
+1. The write must be atomic.
 
 In order to annotate a relevant field, simply apply *both* annotations from
 above. For example:
