@@ -1,6 +1,6 @@
 module github.com/kakkoyun/checklocks
 
-go 1.24.4
+go 1.23.1
 
 require (
 	golang.org/x/tools v0.34.0
